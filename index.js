@@ -7,9 +7,10 @@
 const express = require('express');
 const QRCode = require('qrcode');
 const { PORT } = require('./config');
-const { startBot, getState } = require('./bot');
+const { startBot, getState, requestPairing } = require('./bot');
 
 const app = express();
+app.use(express.urlencoded({ extended: true }));
 
 app.get('/', async (req, res) => {
   const state = getState();
@@ -17,6 +18,8 @@ app.get('/', async (req, res) => {
   if (state.status === 'qr' && state.qr) {
     qrImg = await QRCode.toDataURL(state.qr);
   }
+  const pairError = req.query.error ? decodeURIComponent(req.query.error) : '';
+  const showPairForm = req.query.pair === '1';
 
   res.send(`
 <!DOCTYPE html>
@@ -24,7 +27,7 @@ app.get('/', async (req, res) => {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta http-equiv="refresh" content="5" />
+${showPairForm ? '' : '<meta http-equiv="refresh" content="5" />'}
 <title>All Media Downloader — WhatsApp Bot</title>
 <style>
   * { box-sizing: border-box; }
@@ -66,6 +69,23 @@ app.get('/', async (req, res) => {
   .hint { font-size: 13px; color: #9fb8ab; line-height: 1.5; }
   .connected-box { padding: 40px 0; }
   .connected-box .icon { font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #25d366; margin-bottom: 12px; }
+  .link-btn {
+    display: inline-block; margin-top: 16px; background: none; border: none;
+    color: #6fd6a3; font-size: 13px; text-decoration: underline; cursor: pointer;
+  }
+  .pair-form { margin-top: 20px; text-align: left; }
+  .pair-form label { display: block; font-size: 12px; color: #9fb8ab; margin-bottom: 6px; }
+  .pair-form input {
+    width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06);
+    color: #eafff2; font-size: 15px; margin-bottom: 12px;
+  }
+  .pair-form input::placeholder { color: #6b8377; }
+  .pair-form button {
+    width: 100%; padding: 12px 14px; border-radius: 12px; border: none;
+    background: #25d366; color: #05130b; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .error-msg { color: #ff6b6b; font-size: 12px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -83,10 +103,22 @@ app.get('/', async (req, res) => {
       <div class="status pairing"><span class="dot"></span>Waiting for pairing</div>
       <div class="code">${state.pairingCode}</div>
       <p class="hint">Open WhatsApp app, go to Settings &gt; Linked Devices &gt; Link a Device &gt;<br>"Link with phone number instead", then enter this code.<br><br>Number: ${state.phoneNumber}</p>
+      <a class="link-btn" href="/">Refresh status</a>
     ` : state.status === 'qr' && qrImg ? `
       <div class="status qr"><span class="dot"></span>Waiting for scan</div>
-      <img class="qr" src="${qrImg}" alt="QR Code" />
-      <p class="hint">Open WhatsApp app, go to Settings &gt; Linked Devices &gt; Link a Device, then scan this QR code.</p>
+      ${showPairForm ? `
+        <form class="pair-form" method="POST" action="/pair">
+          <label>WhatsApp number (with country code, no + or spaces)</label>
+          <input type="text" name="phoneNumber" placeholder="e.g. 8801XXXXXXXXX" required />
+          <button type="submit">Get Pairing Code</button>
+        </form>
+        ${pairError ? `<p class="error-msg">${pairError}</p>` : ''}
+        <a class="link-btn" href="/">Back to QR code</a>
+      ` : `
+        <img class="qr" src="${qrImg}" alt="QR Code" />
+        <p class="hint">Open WhatsApp app, go to Settings &gt; Linked Devices &gt; Link a Device, then scan this QR code.</p>
+        <a class="link-btn" href="/?pair=1">Use number instead</a>
+      `}
     ` : `
       <div class="status starting"><span class="dot"></span>Starting...</div>
       <p class="hint">Bot is starting, please wait. This page will auto-refresh.</p>
@@ -97,13 +129,23 @@ app.get('/', async (req, res) => {
   `);
 });
 
+app.post('/pair', async (req, res) => {
+  const phoneNumber = (req.body.phoneNumber || '').trim();
+  try {
+    await requestPairing(phoneNumber);
+    res.redirect('/');
+  } catch (err) {
+    res.redirect(`/?pair=1&error=${encodeURIComponent(err.message)}`);
+  }
+});
+
 app.get('/status', (req, res) => {
   const state = getState();
   res.json({ status: state.status, connected: state.status === 'connected' });
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Dashboard running on port ${PORT}`);
+  console.log(`Dashboard running on port ${PORT}`);
 });
 
 startBot(() => {

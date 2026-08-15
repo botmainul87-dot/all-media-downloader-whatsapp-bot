@@ -172,4 +172,25 @@ function getState() {
   return state;
 }
 
-module.exports = { startBot, getState };
+// Called from the dashboard when the user types a number and submits the form.
+// Requests a fresh pairing code from the already-running socket.
+async function requestPairing(phoneNumber) {
+  if (!sock) {
+    throw new Error('Bot is not ready yet. Please wait a moment and try again.');
+  }
+  if (sock.authState?.creds?.registered) {
+    throw new Error('Already connected. Log out first to link a different number.');
+  }
+  const cleaned = phoneNumber.replace(/[^0-9]/g, '');
+  if (!cleaned) {
+    throw new Error('Please enter a valid phone number with country code.');
+  }
+  const code = await sock.requestPairingCode(cleaned);
+  state.pairingCode = code;
+  state.status = 'pairing';
+  state.phoneNumber = cleaned;
+  state.qr = null;
+  return code;
+}
+
+module.exports = { startBot, getState, requestPairing };
