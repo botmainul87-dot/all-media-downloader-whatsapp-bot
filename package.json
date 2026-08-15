@@ -1,0 +1,20 @@
+{
+  "name": "all-media-downloader-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot for All Media Downloader (TikTok/Instagram/Facebook) - CODEX-M41NUL",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "axios": "^1.7.7",
+    "express": "^4.21.1",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  }
+}
