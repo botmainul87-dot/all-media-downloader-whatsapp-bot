@@ -22,6 +22,7 @@ const state = {
 };
 
 let sock = null;
+let pairingRequested = false;
 
 async function startBot(onStateChange) {
   const { state: authState, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
@@ -32,13 +33,19 @@ async function startBot(onStateChange) {
     auth: authState,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: ['All Media Downloader', 'Chrome', '1.0.0'],
+    browser: ['Ubuntu', 'Chrome', '20.0.04'],
   });
 
-  // Pairing-code login: only requested once, right after socket creation,
-  // and only if not already registered.
-  if (PAIRING_NUMBER && !sock.authState.creds.registered) {
+  // Pairing-code login: only requested once per registration attempt,
+  // and only if not already registered. We guard with `pairingRequested`
+  // so a reconnect loop doesn't keep invalidating the previous code before
+  // the user has a chance to enter it.
+  if (PAIRING_NUMBER && !sock.authState.creds.registered && !pairingRequested) {
+    pairingRequested = true;
     try {
+      // WhatsApp needs the socket to settle before it will hand out a
+      // pairing code — requesting immediately after creation causes 428/405.
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       const code = await sock.requestPairingCode(PAIRING_NUMBER.replace(/[^0-9]/g, ''));
       state.pairingCode = code;
       state.status = 'pairing';
@@ -47,6 +54,7 @@ async function startBot(onStateChange) {
       console.log(`\nPAIRING CODE: ${code}\nOpen WhatsApp > Linked Devices > Link with phone number, then enter this code.\n`);
     } catch (err) {
       console.error('Failed to request pairing code:', err.message);
+      pairingRequested = false; // allow a retry on the next connection attempt
     }
   }
 
@@ -76,7 +84,7 @@ async function startBot(onStateChange) {
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       console.log('Connection closed.', statusCode, 'Reconnecting:', shouldReconnect);
       if (shouldReconnect) {
-        setTimeout(() => startBot(onStateChange), 3000);
+        setTimeout(() => startBot(onStateChange), 8000);
       } else {
         console.log('Logged out. Delete the session folder and restart to re-login.');
       }
@@ -186,6 +194,7 @@ async function requestPairing(phoneNumber) {
     throw new Error('Please enter a valid phone number with country code.');
   }
   const code = await sock.requestPairingCode(cleaned);
+  pairingRequested = true;
   state.pairingCode = code;
   state.status = 'pairing';
   state.phoneNumber = cleaned;
