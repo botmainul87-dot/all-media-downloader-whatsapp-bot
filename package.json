@@ -11,10 +11,10 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.9",
+    "atexovi-baileys": "7.5.6-rc.6",
     "axios": "^1.7.7",
     "express": "^4.21.1",
-    "pino": "^9.5.0",
+    "pino": "^10.1.0",
     "qrcode": "^1.5.4"
   }
 }

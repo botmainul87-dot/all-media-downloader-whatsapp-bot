@@ -8,7 +8,7 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-} = require('@whiskeysockets/baileys');
+} = require('atexovi-baileys');
 const pino = require('pino');
 const { PAIRING_NUMBER, SESSION_DIR, MAX_VIDEO_MB } = require('./config');
 const { detectPlatform, fetchVideoInfo, streamVideo } = require('./lib/api');
