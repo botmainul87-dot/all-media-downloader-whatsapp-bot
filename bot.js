@@ -35,7 +35,17 @@ let pairingRequested = false;
 
 async function startBot(onStateChange) {
   const { state: authState, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
-  const { version } = await fetchLatestBaileysVersion();
+
+  let version;
+  try {
+    const versionTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('version check timed out')), 10000)
+    );
+    ({ version } = await Promise.race([fetchLatestBaileysVersion(), versionTimeout]));
+  } catch (err) {
+    console.error('Could not fetch latest Baileys version, using library default:', err.message);
+    version = undefined; // makeWASocket falls back to its bundled default version
+  }
 
   sock = makeWASocket({
     version,
@@ -159,6 +169,13 @@ function getState() {
   return state;
 }
 
+// Called from index.js if startBot() rejects, so the dashboard shows the
+// failure instead of being stuck on "Starting..." forever.
+function setStartError(message) {
+  state.status = 'error';
+  state.errorMessage = message;
+}
+
 // Called from the dashboard when the user types a number and submits the form.
 // Requests a fresh pairing code from the already-running socket.
 async function requestPairing(phoneNumber) {
@@ -181,4 +198,4 @@ async function requestPairing(phoneNumber) {
   return code;
 }
 
-module.exports = { startBot, getState, requestPairing };
+module.exports = { startBot, getState, requestPairing, setStartError };

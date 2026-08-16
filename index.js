@@ -7,7 +7,7 @@
 const express = require('express');
 const QRCode = require('qrcode');
 const { PORT } = require('./config');
-const { startBot, getState, requestPairing } = require('./bot');
+const { startBot, getState, requestPairing, setStartError } = require('./bot');
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -99,6 +99,10 @@ ${showPairForm ? '' : '<meta http-equiv="refresh" content="5" />'}
         <div class="icon">CONNECTED</div>
         <p class="hint">Bot is ready. Send a link on WhatsApp to test it.</p>
       </div>
+    ` : state.status === 'error' ? `
+      <div class="status disconnected"><span class="dot"></span>Failed to start</div>
+      <p class="error-msg">${state.errorMessage || 'Unknown error.'}</p>
+      <p class="hint">Check the Render logs for details, then restart the service to try again.</p>
     ` : state.status === 'pairing' && state.pairingCode ? `
       <div class="status pairing"><span class="dot"></span>Waiting for pairing</div>
       <div class="code">${state.pairingCode}</div>
@@ -152,4 +156,5 @@ startBot(() => {
   // state updates automatically reflected via getState() on next page load
 }).catch((err) => {
   console.error('Failed to start bot:', err);
+  setStartError(err.message || 'Unknown error while starting the bot.');
 });
