@@ -6,7 +6,6 @@
 const {
   default: makeWASocket,
   useMultiFileAuthState,
-  DisconnectReason,
   fetchLatestBaileysVersion,
 } = require('atexovi-baileys');
 const pino = require('pino');
@@ -81,13 +80,7 @@ async function startBot(onStateChange) {
       state.status = 'disconnected';
       onStateChange && onStateChange(state);
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log('Connection closed.', statusCode, 'Reconnecting:', shouldReconnect);
-      if (shouldReconnect) {
-        setTimeout(() => startBot(onStateChange), 8000);
-      } else {
-        console.log('Logged out. Delete the session folder and restart to re-login.');
-      }
+      console.log('Connection closed.', statusCode, '— auto-reconnect disabled, restart the service to reconnect.');
     }
   });
 
