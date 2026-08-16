@@ -10,11 +10,6 @@ module.exports = {
     { base: 'https://all-media-downloader-api-0rts.onrender.com', key: 'm41nul' },
   ],
 
-  // Set this in Render's Environment Variables to use pairing-code login
-  // (login by typing your number instead of scanning a QR).
-  // Format: full number with country code, no + and no spaces. e.g. 8801XXXXXXXXX
-  PAIRING_NUMBER: process.env.PAIRING_NUMBER || '',
-
   // Port for the small web dashboard (QR / pairing code / status)
   PORT: process.env.PORT || 3000,
 

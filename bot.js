@@ -8,9 +8,19 @@ const {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
 } = require('atexovi-baileys');
+const fs = require('fs');
 const pino = require('pino');
-const { PAIRING_NUMBER, SESSION_DIR, MAX_VIDEO_MB } = require('./config');
+const { SESSION_DIR, MAX_VIDEO_MB } = require('./config');
 const { detectPlatform, fetchVideoInfo, streamVideo } = require('./lib/api');
+
+// Wipe any old WhatsApp login session on every process start, so a Render
+// restart/redeploy always comes up fresh and requires a new QR/pairing login
+// instead of trying (and possibly failing) to resume an old session.
+try {
+  fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+} catch (err) {
+  console.error('Could not clear old session folder:', err.message);
+}
 
 // Shared state the web dashboard reads from
 const state = {
@@ -35,34 +45,12 @@ async function startBot(onStateChange) {
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
   });
 
-  // Pairing-code login: only requested once per registration attempt,
-  // and only if not already registered. We guard with `pairingRequested`
-  // so a reconnect loop doesn't keep invalidating the previous code before
-  // the user has a chance to enter it.
-  if (PAIRING_NUMBER && !sock.authState.creds.registered && !pairingRequested) {
-    pairingRequested = true;
-    try {
-      // WhatsApp needs the socket to settle before it will hand out a
-      // pairing code — requesting immediately after creation causes 428/405.
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      const code = await sock.requestPairingCode(PAIRING_NUMBER.replace(/[^0-9]/g, ''));
-      state.pairingCode = code;
-      state.status = 'pairing';
-      state.phoneNumber = PAIRING_NUMBER;
-      onStateChange && onStateChange(state);
-      console.log(`\nPAIRING CODE: ${code}\nOpen WhatsApp > Linked Devices > Link with phone number, then enter this code.\n`);
-    } catch (err) {
-      console.error('Failed to request pairing code:', err.message);
-      pairingRequested = false; // allow a retry on the next connection attempt
-    }
-  }
-
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
+    const { connection, qr } = update;
 
-    if (qr && !PAIRING_NUMBER) {
+    if (qr) {
       state.qr = qr;
       state.status = 'qr';
       onStateChange && onStateChange(state);
@@ -79,8 +67,6 @@ async function startBot(onStateChange) {
     if (connection === 'close') {
       state.status = 'disconnected';
       onStateChange && onStateChange(state);
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      console.log('Connection closed.', statusCode, '— auto-reconnect disabled, restart the service to reconnect.');
     }
   });
 
